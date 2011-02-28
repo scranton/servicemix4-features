@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Copyright 2011 FuseSource
+  ~
+  ~    Licensed under the Apache License, Version 2.0 (the "License");
+  ~    you may not use this file except in compliance with the License.
+  ~    You may obtain a copy of the License at
+  ~
+  ~        http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~    Unless required by applicable law or agreed to in writing, software
+  ~    distributed under the License is distributed on an "AS IS" BASIS,
+  ~    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~    See the License for the specific language governing permissions and
+  ~    limitations under the License.
+  -->
+<!-- START SNIPPET: beans -->
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:cxf="http://camel.apache.org/schema/cxf"
+       xmlns:camel="http://camel.apache.org/schema/spring"
+       xmlns:jaxws="http://cxf.apache.org/jaxws"
+       xmlns:osgi="http://www.springframework.org/schema/osgi"
+       xmlns:p="http://www.springframework.org/schema/p"
+       xsi:schemaLocation="
+        http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://cxf.apache.org/jaxws http://cxf.apache.org/schemas/jaxws.xsd
+        http://www.springframework.org/schema/osgi http://www.springframework.org/schema/osgi/spring-osgi.xsd
+        http://camel.apache.org/schema/cxf http://camel.apache.org/schema/cxf/camel-cxf.xsd
+        http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd
+    ">
+
+    <import resource="classpath:META-INF/cxf/cxf.xml"/>
+    <import resource="classpath:META-INF/cxf/cxf-extension-soap.xml"/>
+    <import resource="classpath:META-INF/cxf/cxf-extension-jms.xml"/>
+
+    <cxf:cxfEndpoint id="JMSEndpoint"
+                     serviceClass="org.apache.servicemix.examples.cxf.HelloWorld"
+                     address="jms:jndi:dynamicQueues/test.cxf.jmstransport.queue"
+                     wsdlURL="wsdl/hello_world.wsdl"
+                     endpointName="e:HelloWorldImplPort"
+                     serviceName="s:HelloWorldImplService"
+                     xmlns:e="http://cxf.examples.servicemix.apache.org/"
+                     xmlns:s="http://cxf.examples.servicemix.apache.org/"
+                     transportId="http://www.w3.org/2010/soapjms/">
+        <cxf:features>
+            <bean xmlns="http://www.springframework.org/schema/beans"
+                    class="org.apache.cxf.transport.jms.JMSConfigFeature"
+                    p:jmsConfig-ref="jmsConfig"/>
+        </cxf:features>
+    </cxf:cxfEndpoint>
+
+    <bean id="HelloWorldImpl" class="org.apache.servicemix.examples.cxf_jms_osgi.HelloWorldImpl"/>
+
+    <camel:camelContext trace="true" >
+        <camel:route>
+            <camel:from uri="cxf:bean:JMSEndpoint"/>
+            <camel:bean ref="HelloWorldImpl"/>
+        </camel:route>
+
+        <camel:route>
+            <camel:from uri="timer://foo?fixedRate=true&amp;period=1000"/>
+            <camel:to uri="log:iAmAlive"/>
+        </camel:route>
+    </camel:camelContext>
+
+
+    <!--
+        <jaxws:endpoint id="JMSEndpoint"
+            implementor="org.apache.servicemix.examples.cxf_jms_osgi.HelloWorldImpl"
+            wsdlLocation="wsdl/hello_world.wsdl"
+            endpointName="e:HelloWorldImplPort"
+            serviceName="s:HelloWorldImplService"
+            xmlns:e="http://cxf.examples.servicemix.apache.org/"
+                xmlns:s="http://cxf.examples.servicemix.apache.org/">
+                <jaxws:features>
+                    <bean xmlns="http://www.springframework.org/schema/beans"
+                            class="org.apache.cxf.transport.jms.JMSConfigFeature"
+                            p:jmsConfig-ref="jmsConfig"/>
+                </jaxws:features>
+            </jaxws:endpoint>
+    -->
+
+
+    <jaxws:client id="client"
+                  serviceClass="org.apache.servicemix.examples.cxf.HelloWorld"
+                  endpointName="e:HelloWorldImplPort"
+                  serviceName="s:HelloWorldImplService"
+                  xmlns:e="http://cxf.examples.servicemix.apache.org/"
+                  xmlns:s="http://cxf.examples.servicemix.apache.org/"
+                  wsdlLocation="wsdl/hello_world.wsdl"
+            >
+        <jaxws:features>
+            <bean xmlns="http://www.springframework.org/schema/beans"
+                  class="org.apache.cxf.transport.jms.JMSConfigFeature"
+                  p:jmsConfig-ref="jmsConfig"/>
+        </jaxws:features>
+    </jaxws:client>
+
+    <bean id="jmsConfig" class="org.apache.cxf.transport.jms.JMSConfiguration"
+          p:connectionFactory-ref="jmsConnectionFactory"
+          p:targetDestination="test.cxf.jmstransport.queue"
+            />
+
+    <bean id="jmsConnectionFactory" class="org.springframework.jms.connection.SingleConnectionFactory">
+        <property name="targetConnectionFactory">
+            <bean class="org.apache.activemq.ActiveMQConnectionFactory">
+                <property name="brokerURL" value="tcp://localhost:61616"/>
+            </bean>
+        </property>
+    </bean>
+
+    <osgi:service id="testHelloWorld" ref="client"
+                  interface="org.apache.servicemix.examples.cxf.HelloWorld">
+        <osgi:service-properties>
+            <entry key="TEST-BUNDLE-NAME" value="camel-cxf-jms-osgi"/>
+        </osgi:service-properties>
+    </osgi:service>
+
+
+</beans>
+        <!-- END SNIPPET: beans -->
